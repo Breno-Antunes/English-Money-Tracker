@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <title>English Money Tracker</title>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
   <style>
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -71,11 +73,11 @@
       border-bottom: 2px solid #ccc;
     }
     .tab-buttons button {
-      background-color: #e0e0e0;
+      background-color: #f1f1f1;
       border: 1px solid #ccc;
       padding: 6px 12px;
       border-radius: 8px 8px 0 0;
-      color: #000;
+      margin: 0;
     }
     .tab-buttons button.active {
       background-color: white;
@@ -92,7 +94,7 @@
     }
     .class-title {
       font-weight: bold;
-      font-size: 22px;
+      font-size: 20px;
       margin: 15px 0 5px 0;
       color: #003366;
     }
@@ -106,270 +108,129 @@
 </head>
 <body>
   <h1>ENGLISH MONEY TRACKER</h1>
-
   <div class="header-area">
     <input type="text" id="newClassName" placeholder="Nome da nova turma">
-    <button onclick="createClass()">Criar Turma</button>
-    <button onclick="resetAll()">Resetar Tudo</button>
-    <button onclick="downloadReport()">Baixar Relatório</button>
+    <button onclick="createClass()">Criar turma</button>
   </div>
-
   <div class="tab-buttons" id="tabButtons"></div>
   <div id="tabs"></div>
 
   <script>
-    function sanitizeId(name) {
-      return `tab-${name.replace(/[^a-zA-Z0-9_-]/g, '')}`;
-    }
+    const firebaseConfig = {
+      apiKey: "AIzaSyDsn0ZeBseWNUaSCUXIpH4lcPpCfDMJpuo",
+      authDomain: "english-money-tracker-f5633.firebaseapp.com",
+      databaseURL: "https://english-money-tracker-f5633-default-rtdb.firebaseio.com",
+      projectId: "english-money-tracker-f5633",
+      storageBucket: "english-money-tracker-f5633.firebasestorage.app",
+      messagingSenderId: "858563470666",
+      appId: "1:858563470666:web:f06ca83dbbf04c01d0cdb3"
+    };
 
-    let classes = JSON.parse(localStorage.getItem("classes")) || {};
-    let currentTab = null;
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
 
     function createClass() {
-      const className = document.getElementById('newClassName').value.trim();
-      if (!className || classes[className]) return;
-      classes[className] = [];
-      saveData();
+      const className = document.getElementById("newClassName").value.trim();
+      if (!className) return;
+      db.ref("classes/" + className).set([]);
+      document.getElementById("newClassName").value = "";
       renderTabs();
-      switchTab(className);
-      document.getElementById('newClassName').value = '';
-    }
-
-    function deleteClass(className) {
-      if (confirm(`Tem certeza que deseja excluir a turma "${className}"?`)) {
-        delete classes[className];
-        saveData();
-        renderTabs();
-      }
-    }
-
-    function handleTextareaEnter(e, className, textarea) {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        const names = textarea.value.trim().split(/\n+/);
-        names.forEach(name => {
-          if (!classes[className].some(s => s.name === name)) {
-            classes[className].push({
-              name,
-              dictation: 0,
-              lessonCheck: 0,
-              sala: 0,
-              extra: 0,
-              total: 0,
-              turma: className
-            });
-          }
-        });
-        textarea.value = '';
-        saveData();
-        renderTable(className);
-        renderRanking();
-      }
     }
 
     function renderTabs() {
-      const tabButtons = document.getElementById('tabButtons');
-      const tabs = document.getElementById('tabs');
-      tabButtons.innerHTML = '';
-      tabs.innerHTML = '';
+      db.ref("classes").once("value", snapshot => {
+        const classes = snapshot.val() || {};
+        const tabButtons = document.getElementById("tabButtons");
+        const tabs = document.getElementById("tabs");
+        tabButtons.innerHTML = "";
+        tabs.innerHTML = "";
 
-      for (let className in classes) {
-        const safeId = sanitizeId(className);
+        Object.keys(classes).forEach(className => {
+          const btn = document.createElement("button");
+          btn.textContent = className;
+          btn.onclick = () => switchTab(className);
+          tabButtons.appendChild(btn);
 
-        const btn = document.createElement('button');
-        btn.textContent = className;
-        btn.onclick = () => switchTab(className);
-        if (className === currentTab) btn.classList.add('active');
-        tabButtons.appendChild(btn);
-
-        const deleteBtn = document.createElement('button');
-        deleteBtn.textContent = 'X';
-        deleteBtn.className = 'delete-btn';
-        deleteBtn.onclick = () => deleteClass(className);
-        tabButtons.appendChild(deleteBtn);
-
-        const tab = document.createElement('div');
-        tab.className = 'tab';
-        tab.id = safeId;
-        tab.innerHTML = `
-          <div class="class-title">Turma: ${className}</div>
-          <p>Use Shift + Enter para pular linha entre nomes. Pressione Enter para adicionar.</p>
-          <textarea placeholder="Adicionar alunos..." onkeydown="handleTextareaEnter(event, '${className}', this)"></textarea>
-          <table>
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Nome</th>
-                <th>Dictation</th>
-                <th>Lesson Check</th>
-                <th>Atividades em Sala</th>
-                <th>Extras</th>
-                <th>Total</th>
-                <th>Ações</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
-        `;
-        tabs.appendChild(tab);
-        renderTable(className);
-      }
-
-      const rankBtn = document.createElement('button');
-      rankBtn.textContent = "Ranking Geral";
-      rankBtn.onclick = () => switchTab('ranking');
-      if (currentTab === 'ranking') rankBtn.classList.add('active');
-      tabButtons.appendChild(rankBtn);
-
-      const rankTab = document.createElement('div');
-      rankTab.className = 'tab';
-      rankTab.id = 'tab-ranking';
-      rankTab.innerHTML = `
-        <div class="class-title">🏆 Ranking Geral</div>
-        <table>
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Nome</th>
-              <th>Turma</th>
-              <th>Total</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      `;
-      tabs.appendChild(rankTab);
-      renderRanking();
-
-      const classNames = Object.keys(classes);
-      if (!currentTab && classNames.length > 0) {
-        currentTab = classNames[0];
-      }
-      if (currentTab) {
-        switchTab(currentTab);
-      }
+          const tab = document.createElement("div");
+          tab.className = "tab";
+          tab.id = "tab-" + className;
+          tab.innerHTML = `
+            <div class="class-title">Turma: ${className}</div>
+            <textarea placeholder="Adicionar alunos... (Shift+Enter para múltiplos)"></textarea>
+            <button onclick="addStudents('${className}', this.previousElementSibling.value)">Adicionar Alunos</button>
+            <table>
+              <thead>
+                <tr>
+                  <th>Nome</th>
+                  <th>Dictation</th>
+                  <th>Lesson Check</th>
+                  <th>Sala</th>
+                  <th>Extra</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-${className}"></tbody>
+            </table>
+          `;
+          tabs.appendChild(tab);
+          renderTable(className);
+        });
+      });
     }
 
     function switchTab(className) {
-      currentTab = className;
-      document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
-      document.querySelectorAll('.tab-buttons button').forEach(btn => btn.classList.remove('active'));
-      const safeId = sanitizeId(className);
-      const target = document.getElementById(safeId);
-      if (target) target.classList.add('active');
-      const btns = document.querySelectorAll('.tab-buttons button');
-      btns.forEach(b => {
-        if (b.textContent === className || (className === 'ranking' && b.textContent.includes('Ranking'))) {
-          b.classList.add('active');
-        }
+      document.querySelectorAll(".tab").forEach(el => el.classList.remove("active"));
+      const tab = document.getElementById("tab-" + className);
+      if (tab) tab.classList.add("active");
+    }
+
+    function addStudents(className, text) {
+      const names = text.split(/\n+/).map(n => n.trim()).filter(Boolean);
+      const ref = db.ref("classes/" + className);
+      ref.once("value", snapshot => {
+        const list = snapshot.val() || [];
+        names.forEach(name => {
+          if (!list.some(s => s.name === name)) {
+            list.push({ name, dictation: 0, lessonCheck: 0, sala: 0, extra: 0 });
+          }
+        });
+        ref.set(list);
+        renderTable(className);
       });
     }
 
     function renderTable(className) {
-      const safeId = sanitizeId(className);
-      const tbody = document.querySelector(`#${safeId} tbody`);
+      const tbody = document.getElementById("tbody-" + className);
       if (!tbody) return;
-      tbody.innerHTML = '';
-      const list = classes[className];
-      list.sort((a, b) => b.total - a.total);
-      list.forEach((student, index) => {
-        const row = tbody.insertRow();
-        row.insertCell(0).textContent = index + 1;
-        row.insertCell(1).textContent = student.name;
-
-        ['dictation', 'lessonCheck', 'sala', 'extra'].forEach(field => {
-          const cell = row.insertCell();
-          const btnAdd = document.createElement('button');
-          btnAdd.textContent = '+';
-          btnAdd.onclick = () => updatePoints(className, student.name, field, 1);
-
-          const btnSub = document.createElement('button');
-          btnSub.textContent = '-';
-          btnSub.onclick = () => updatePoints(className, student.name, field, -1);
-
-          cell.innerHTML = `${student[field]} `;
-          cell.appendChild(btnAdd);
-          cell.appendChild(btnSub);
+      db.ref("classes/" + className).once("value", snapshot => {
+        const list = snapshot.val() || [];
+        tbody.innerHTML = "";
+        list.forEach(s => {
+          const row = document.createElement("tr");
+          const total = s.dictation + s.lessonCheck + s.sala + s.extra;
+          row.innerHTML = `
+            <td>${s.name}</td>
+            <td><button onclick="update('${className}','${s.name}','dictation',1)">+1</button> ${s.dictation}</td>
+            <td><button onclick="update('${className}','${s.name}','lessonCheck',1)">+1</button> ${s.lessonCheck}</td>
+            <td><button onclick="update('${className}','${s.name}','sala',1)">+1</button> ${s.sala}</td>
+            <td><button onclick="update('${className}','${s.name}','extra',1)">+1</button> ${s.extra}</td>
+            <td>${total}</td>
+          `;
+          tbody.appendChild(row);
         });
-
-        row.insertCell().textContent = student.total;
-
-        const deleteCell = row.insertCell();
-        const deleteBtn = document.createElement('button');
-        deleteBtn.textContent = 'Excluir';
-        deleteBtn.onclick = () => deleteStudent(className, student.name);
-        deleteCell.appendChild(deleteBtn);
       });
     }
 
-    function updatePoints(className, studentName, type, amount) {
-      const student = classes[className].find(s => s.name === studentName);
-      if (!student) return;
-      student[type] += amount;
-      if (student[type] < 0) student[type] = 0;
-      student.total = student.dictation + student.lessonCheck + student.sala + student.extra;
-      saveData();
-      renderTable(className);
-      renderRanking();
-    }
-
-    function deleteStudent(className, studentName) {
-      if (confirm(`Excluir aluno "${studentName}" da turma "${className}"?`)) {
-        classes[className] = classes[className].filter(s => s.name !== studentName);
-        saveData();
+    function update(className, studentName, field, amount) {
+      const ref = db.ref("classes/" + className);
+      ref.once("value", snapshot => {
+        const list = snapshot.val() || [];
+        const student = list.find(s => s.name === studentName);
+        if (!student) return;
+        student[field] += amount;
+        ref.set(list);
         renderTable(className);
-        renderRanking();
-      }
-    }
-
-    function renderRanking() {
-      const tbody = document.querySelector('#tab-ranking tbody');
-      if (!tbody) return;
-      tbody.innerHTML = '';
-      const allStudents = Object.values(classes).flat();
-      allStudents.sort((a, b) => b.total - a.total);
-      allStudents.forEach((s, i) => {
-        const row = tbody.insertRow();
-        row.insertCell(0).textContent = i + 1;
-        row.insertCell(1).textContent = s.name;
-        row.insertCell(2).textContent = s.turma;
-        row.insertCell(3).textContent = s.total;
       });
-    }
-
-    function resetAll() {
-      if (!confirm("Tem certeza que deseja zerar todos os English Money?")) return;
-      for (let turma in classes) {
-        classes[turma].forEach(s => {
-          s.dictation = 0;
-          s.lessonCheck = 0;
-          s.sala = 0;
-          s.extra = 0;
-          s.total = 0;
-        });
-      }
-      saveData();
-      renderTabs();
-    }
-
-    function downloadReport() {
-      let csv = "Turma,Nome,Dictation,Lesson Check,Sala,Extras,Total\n";
-      for (let turma in classes) {
-        classes[turma].forEach(s => {
-          csv += `${turma},${s.name},${s.dictation},${s.lessonCheck},${s.sala},${s.extra},${s.total}\n`;
-        });
-      }
-      const blob = new Blob([csv], { type: 'text/csv' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = 'english_money_report.csv';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
-
-    function saveData() {
-      localStorage.setItem("classes", JSON.stringify(classes));
     }
 
     renderTabs();
