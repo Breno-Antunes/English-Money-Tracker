@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>English Money Tracker</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(to right, #f0f4ff, #ffffff);
+      padding: 20px;
+      margin: 0;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 30px;
+      color: #003366;
+    }
+    textarea, button, input {
+      font-size: 16px;
+    }
+    textarea {
+      width: 100%;
+      height: 80px;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      resize: none;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+      background-color: white;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 10px;
+      text-align: center;
+    }
+    th {
+      background-color: #e8f0fe;
+    }
+    button {
+      padding: 6px 12px;
+      margin: 2px;
+      cursor: pointer;
+      border-radius: 5px;
+      border: none;
+      background-color: #007bff;
+      color: white;
+      transition: background-color 0.3s;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    .tab {
+      display: none;
+    }
+    .tab.active {
+      display: block;
+    }
+    .tab-buttons {
+      display: flex;
+      gap: 5px;
+      margin-bottom: 10px;
+      overflow-x: auto;
+      padding: 10px 0;
+      border-bottom: 2px solid #ccc;
+    }
+    .tab-buttons button {
+      background-color: #e0e0e0;
+      border: 1px solid #ccc;
+      padding: 6px 12px;
+      border-radius: 8px 8px 0 0;
+      color: #000;
+    }
+    .tab-buttons button.active {
+      background-color: white;
+      border-bottom: 2px solid white;
+      font-weight: bold;
+      color: #007bff;
+    }
+    .header-area {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .class-title {
+      font-weight: bold;
+      font-size: 22px;
+      margin: 15px 0 5px 0;
+      color: #003366;
+    }
+    .delete-btn {
+      background-color: #dc3545;
+    }
+    .delete-btn:hover {
+      background-color: #a71d2a;
+    }
+  </style>
+</head>
+<body>
+  <h1>ENGLISH MONEY TRACKER</h1>
+
+  <div class="header-area">
+    <input type="text" id="newClassName" placeholder="Nome da nova turma">
+    <button onclick="createClass()">Criar Turma</button>
+    <button onclick="resetAll()">Resetar Tudo</button>
+    <button onclick="downloadReport()">Baixar Relatório</button>
+  </div>
+
+  <div class="tab-buttons" id="tabButtons"></div>
+  <div id="tabs"></div>
+
+  <script>
+    function sanitizeId(name) {
+      return `tab-${name.replace(/[^a-zA-Z0-9_-]/g, '')}`;
+    }
+
+    let classes = JSON.parse(localStorage.getItem("classes")) || {};
+    let currentTab = null;
+
+    function createClass() {
+      const className = document.getElementById('newClassName').value.trim();
+      if (!className || classes[className]) return;
+      classes[className] = [];
+      saveData();
+      renderTabs();
+      switchTab(className);
+      document.getElementById('newClassName').value = '';
+    }
+
+    function deleteClass(className) {
+      if (confirm(`Tem certeza que deseja excluir a turma "${className}"?`)) {
+        delete classes[className];
+        saveData();
+        renderTabs();
+      }
+    }
+
+    function handleTextareaEnter(e, className, textarea) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        const names = textarea.value.trim().split(/\n+/);
+        names.forEach(name => {
+          if (!classes[className].some(s => s.name === name)) {
+            classes[className].push({
+              name,
+              dictation: 0,
+              lessonCheck: 0,
+              sala: 0,
+              extra: 0,
+              total: 0,
+              turma: className
+            });
+          }
+        });
+        textarea.value = '';
+        saveData();
+        renderTable(className);
+        renderRanking();
+      }
+    }
+
+    function renderTabs() {
+      const tabButtons = document.getElementById('tabButtons');
+      const tabs = document.getElementById('tabs');
+      tabButtons.innerHTML = '';
+      tabs.innerHTML = '';
+
+      for (let className in classes) {
+        const safeId = sanitizeId(className);
+
+        const btn = document.createElement('button');
+        btn.textContent = className;
+        btn.onclick = () => switchTab(className);
+        if (className === currentTab) btn.classList.add('active');
+        tabButtons.appendChild(btn);
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.textContent = 'X';
+        deleteBtn.className = 'delete-btn';
+        deleteBtn.onclick = () => deleteClass(className);
+        tabButtons.appendChild(deleteBtn);
+
+        const tab = document.createElement('div');
+        tab.className = 'tab';
+        tab.id = safeId;
+        tab.innerHTML = `
+          <div class="class-title">Turma: ${className}</div>
+          <p>Use Shift + Enter para pular linha entre nomes. Pressione Enter para adicionar.</p>
+          <textarea placeholder="Adicionar alunos..." onkeydown="handleTextareaEnter(event, '${className}', this)"></textarea>
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Nome</th>
+                <th>Dictation</th>
+                <th>Lesson Check</th>
+                <th>Atividades em Sala</th>
+                <th>Extras</th>
+                <th>Total</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        `;
+        tabs.appendChild(tab);
+        renderTable(className);
+      }
+
+      const rankBtn = document.createElement('button');
+      rankBtn.textContent = "Ranking Geral";
+      rankBtn.onclick = () => switchTab('ranking');
+      if (currentTab === 'ranking') rankBtn.classList.add('active');
+      tabButtons.appendChild(rankBtn);
+
+      const rankTab = document.createElement('div');
+      rankTab.className = 'tab';
+      rankTab.id = 'tab-ranking';
+      rankTab.innerHTML = `
+        <div class="class-title">🏆 Ranking Geral</div>
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Nome</th>
+              <th>Turma</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      `;
+      tabs.appendChild(rankTab);
+      renderRanking();
+
+      const classNames = Object.keys(classes);
+      if (!currentTab && classNames.length > 0) {
+        currentTab = classNames[0];
+      }
+      if (currentTab) {
+        switchTab(currentTab);
+      }
+    }
+
+    function switchTab(className) {
+      currentTab = className;
+      document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+      document.querySelectorAll('.tab-buttons button').forEach(btn => btn.classList.remove('active'));
+      const safeId = sanitizeId(className);
+      const target = document.getElementById(safeId);
+      if (target) target.classList.add('active');
+      const btns = document.querySelectorAll('.tab-buttons button');
+      btns.forEach(b => {
+        if (b.textContent === className || (className === 'ranking' && b.textContent.includes('Ranking'))) {
+          b.classList.add('active');
+        }
+      });
+    }
+
+    function renderTable(className) {
+      const safeId = sanitizeId(className);
+      const tbody = document.querySelector(`#${safeId} tbody`);
+      if (!tbody) return;
+      tbody.innerHTML = '';
+      const list = classes[className];
+      list.sort((a, b) => b.total - a.total);
+      list.forEach((student, index) => {
+        const row = tbody.insertRow();
+        row.insertCell(0).textContent = index + 1;
+        row.insertCell(1).textContent = student.name;
+
+        ['dictation', 'lessonCheck', 'sala', 'extra'].forEach(field => {
+          const cell = row.insertCell();
+          const btnAdd = document.createElement('button');
+          btnAdd.textContent = '+';
+          btnAdd.onclick = () => updatePoints(className, student.name, field, 1);
+
+          const btnSub = document.createElement('button');
+          btnSub.textContent = '-';
+          btnSub.onclick = () => updatePoints(className, student.name, field, -1);
+
+          cell.innerHTML = `${student[field]} `;
+          cell.appendChild(btnAdd);
+          cell.appendChild(btnSub);
+        });
+
+        row.insertCell().textContent = student.total;
+
+        const deleteCell = row.insertCell();
+        const deleteBtn = document.createElement('button');
+        deleteBtn.textContent = 'Excluir';
+        deleteBtn.onclick = () => deleteStudent(className, student.name);
+        deleteCell.appendChild(deleteBtn);
+      });
+    }
+
+    function updatePoints(className, studentName, type, amount) {
+      const student = classes[className].find(s => s.name === studentName);
+      if (!student) return;
+      student[type] += amount;
+      if (student[type] < 0) student[type] = 0;
+      student.total = student.dictation + student.lessonCheck + student.sala + student.extra;
+      saveData();
+      renderTable(className);
+      renderRanking();
+    }
+
+    function deleteStudent(className, studentName) {
+      if (confirm(`Excluir aluno "${studentName}" da turma "${className}"?`)) {
+        classes[className] = classes[className].filter(s => s.name !== studentName);
+        saveData();
+        renderTable(className);
+        renderRanking();
+      }
+    }
+
+    function renderRanking() {
+      const tbody = document.querySelector('#tab-ranking tbody');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+      const allStudents = Object.values(classes).flat();
+      allStudents.sort((a, b) => b.total - a.total);
+      allStudents.forEach((s, i) => {
+        const row = tbody.insertRow();
+        row.insertCell(0).textContent = i + 1;
+        row.insertCell(1).textContent = s.name;
+        row.insertCell(2).textContent = s.turma;
+        row.insertCell(3).textContent = s.total;
+      });
+    }
+
+    function resetAll() {
+      if (!confirm("Tem certeza que deseja zerar todos os English Money?")) return;
+      for (let turma in classes) {
+        classes[turma].forEach(s => {
+          s.dictation = 0;
+          s.lessonCheck = 0;
+          s.sala = 0;
+          s.extra = 0;
+          s.total = 0;
+        });
+      }
+      saveData();
+      renderTabs();
+    }
+
+    function downloadReport() {
+      let csv = "Turma,Nome,Dictation,Lesson Check,Sala,Extras,Total\n";
+      for (let turma in classes) {
+        classes[turma].forEach(s => {
+          csv += `${turma},${s.name},${s.dictation},${s.lessonCheck},${s.sala},${s.extra},${s.total}\n`;
+        });
+      }
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = 'english_money_report.csv';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    function saveData() {
+      localStorage.setItem("classes", JSON.stringify(classes));
+    }
+
+    renderTabs();
+  </script>
+</body>
+</html>
