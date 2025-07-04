@@ -134,7 +134,7 @@
     function createClass() {
       const className = document.getElementById("newClassName").value.trim();
       if (!className) return;
-      db.ref("classes/" + className).set({});
+      db.ref("classes/" + className).set({ __placeholder__: true });
       document.getElementById("newClassName").value = "";
     }
 
@@ -149,6 +149,7 @@
         let csv = "Turma,Nome,Dictation,Lesson Check,Sala,Extras,Total\n";
         for (let className in data) {
           for (let studentName in data[className]) {
+            if (studentName === "__placeholder__") continue;
             const s = data[className][studentName];
             const total = s.dictation + s.lessonCheck + s.sala + s.extra;
             csv += `${className},${studentName},${s.dictation},${s.lessonCheck},${s.sala},${s.extra},${total}\n`;
@@ -233,6 +234,7 @@
         const list = snapshot.val() || {};
         tbody.innerHTML = "";
         Object.entries(list).forEach(([name, s]) => {
+          if (name === "__placeholder__") return;
           const total = s.dictation + s.lessonCheck + s.sala + s.extra;
           const row = document.createElement("tr");
           row.innerHTML = `
