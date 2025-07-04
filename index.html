@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>English Money Tracker</title>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
@@ -71,19 +71,37 @@
       overflow-x: auto;
       padding: 10px 0;
       border-bottom: 2px solid #ccc;
+      align-items: center;
+      flex-wrap: wrap;
     }
-    .tab-buttons button {
+    .tab-buttons button.tab-btn {
       background-color: #f1f1f1;
       border: 1px solid #ccc;
       padding: 6px 12px;
       border-radius: 8px 8px 0 0;
       margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      position: relative;
     }
-    .tab-buttons button.active {
+    .tab-buttons button.tab-btn.active {
       background-color: white;
       border-bottom: 2px solid white;
       font-weight: bold;
       color: #007bff;
+    }
+    .tab-buttons button.delete-tab-btn {
+      background-color: #dc3545;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-weight: bold;
+      line-height: 1;
+      height: 28px;
+      min-width: 28px;
+    }
+    .tab-buttons button.delete-tab-btn:hover {
+      background-color: #a71d2a;
     }
     .header-area {
       display: flex;
@@ -97,19 +115,22 @@
       font-size: 20px;
       margin: 15px 0 5px 0;
       color: #003366;
-    }
-    .delete-btn {
-      background-color: #dc3545;
-    }
-    .delete-btn:hover {
-      background-color: #a71d2a;
+      background: #cfd9f9;
+      padding: 8px 12px;
+      border-radius: 8px;
+      user-select: none;
     }
   </style>
 </head>
 <body>
   <h1>ENGLISH MONEY TRACKER</h1>
   <div class="header-area">
-    <input type="text" id="newClassName" placeholder="Nome da nova turma">
+    <input
+      type="text"
+      id="newClassName"
+      placeholder="Nome da nova turma"
+      onkeydown="if(event.key==='Enter'){ createClass(); }"
+    />
     <button onclick="createClass()">Criar turma</button>
     <button onclick="resetAll()">Resetar Tudo</button>
     <button onclick="downloadReport()">Baixar Relatório</button>
@@ -133,62 +154,86 @@
 
     function createClass() {
       const className = document.getElementById("newClassName").value.trim();
-      if (!className) return;
+      if (!className) return alert("Digite o nome da turma!");
 
       db.ref("classes/" + className).set({ __placeholder__: true }, () => {
         document.getElementById("newClassName").value = "";
-        renderTabs(); // Atualiza as abas para mostrar a nova turma
+        renderTabs(() => switchTab(className));
       });
     }
 
     function resetAll() {
       if (!confirm("Tem certeza que deseja resetar tudo?")) return;
-      db.ref("classes").remove();
+      db.ref("classes").remove(() => {
+        renderTabs();
+      });
     }
 
     function downloadReport() {
-      db.ref("classes").once("value", snapshot => {
-        const data = snapshot.val();
+      db.ref("classes").once("value", (snapshot) => {
+        const data = snapshot.val() || {};
         let csv = "Turma,Nome,Dictation,Lesson Check,Sala,Extras,Total\n";
-        for (let className in data) {
-          for (let studentName in data[className]) {
+        for (const className in data) {
+          for (const studentName in data[className]) {
             if (studentName === "__placeholder__") continue;
             const s = data[className][studentName];
             const total = s.dictation + s.lessonCheck + s.sala + s.extra;
             csv += `${className},${studentName},${s.dictation},${s.lessonCheck},${s.sala},${s.extra},${total}\n`;
           }
         }
-        const blob = new Blob([csv], { type: 'text/csv' });
-        const link = document.createElement('a');
+        const blob = new Blob([csv], { type: "text/csv" });
+        const link = document.createElement("a");
         link.href = URL.createObjectURL(blob);
-        link.download = 'english_money_report.csv';
+        link.download = "english_money_report.csv";
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
       });
     }
 
-    function renderTabs() {
-      db.ref("classes").once("value", snapshot => {
+    function renderTabs(callback) {
+      db.ref("classes").once("value", (snapshot) => {
         const classes = snapshot.val() || {};
         const tabButtons = document.getElementById("tabButtons");
         const tabs = document.getElementById("tabs");
         tabButtons.innerHTML = "";
         tabs.innerHTML = "";
 
-        Object.keys(classes).forEach(className => {
+        // Botões de turmas
+        Object.keys(classes).forEach((className) => {
           const btn = document.createElement("button");
           btn.textContent = className;
+          btn.className = "tab-btn";
           btn.onclick = () => switchTab(className);
-          tabButtons.appendChild(btn);
 
+          const delBtn = document.createElement("button");
+          delBtn.textContent = "X";
+          delBtn.className = "delete-tab-btn";
+          delBtn.title = `Excluir turma "${className}"`;
+          delBtn.onclick = (e) => {
+            e.stopPropagation(); // evitar switchTab
+            if (confirm(`Deseja excluir a turma "${className}"?`)) {
+              db.ref("classes/" + className).remove(() => renderTabs());
+            }
+          };
+
+          const container = document.createElement("div");
+          container.style.display = "flex";
+          container.style.alignItems = "center";
+          container.style.gap = "4px";
+
+          container.appendChild(btn);
+          container.appendChild(delBtn);
+          tabButtons.appendChild(container);
+
+          // Conteúdo da aba
           const tab = document.createElement("div");
           tab.className = "tab";
           tab.id = "tab-" + className;
           tab.innerHTML = `
             <div class="class-title">Turma: ${className}</div>
-            <textarea placeholder="Adicionar alunos... (Shift+Enter para múltiplos)"></textarea>
-            <button onclick="addStudents('${className}', this.previousElementSibling.value)">Adicionar Alunos</button>
+            <textarea id="textarea-${className}" placeholder="Adicionar alunos... (Shift+Enter para múltiplos)" ></textarea>
+            <button id="add-btn-${className}">Adicionar Alunos</button>
             <table>
               <thead>
                 <tr>
@@ -205,49 +250,104 @@
             </table>
           `;
           tabs.appendChild(tab);
+
+          // Evento Enter para adicionar alunos
+          const textarea = tab.querySelector(`#textarea-${className}`);
+          textarea.addEventListener("keydown", (e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              addStudents(className, textarea.value);
+              textarea.value = "";
+            }
+          });
+
+          const addBtn = tab.querySelector(`#add-btn-${className}`);
+          addBtn.onclick = () => {
+            addStudents(className, textarea.value);
+            textarea.value = "";
+          };
+
           renderTable(className);
         });
 
-        // Ativa a primeira aba automaticamente
-        const firstClass = Object.keys(classes)[0];
-        if (firstClass) {
-          switchTab(firstClass);
+        // Aba Ranking Geral
+        const rankBtn = document.createElement("button");
+        rankBtn.textContent = "🏆 Ranking Geral";
+        rankBtn.className = "tab-btn";
+        rankBtn.onclick = () => switchTab("ranking");
+        tabButtons.appendChild(rankBtn);
+
+        const rankTab = document.createElement("div");
+        rankTab.className = "tab";
+        rankTab.id = "tab-ranking";
+        rankTab.innerHTML = `
+          <div class="class-title">🏆 Ranking Geral</div>
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Nome</th>
+                <th>Turma</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-ranking"></tbody>
+          </table>
+        `;
+        tabs.appendChild(rankTab);
+
+        renderRanking();
+
+        if (callback) callback();
+
+        // Ativar aba atual ou primeira
+        const activeBtn = [...tabButtons.querySelectorAll("button.tab-btn")].find((b) =>
+          b.classList.contains("active")
+        );
+        if (!activeBtn) {
+          const first = tabButtons.querySelector("button.tab-btn");
+          if (first) {
+            first.classList.add("active");
+            const firstId = first.textContent === "🏆 Ranking Geral" ? "ranking" : first.textContent;
+            switchTab(firstId);
+          }
         }
       });
     }
 
     function switchTab(className) {
-      document.querySelectorAll(".tab").forEach(el => el.classList.remove("active"));
+      document.querySelectorAll(".tab").forEach((el) => el.classList.remove("active"));
       const tab = document.getElementById("tab-" + className);
       if (tab) tab.classList.add("active");
 
-      document.querySelectorAll(".tab-buttons button").forEach(btn => btn.classList.remove("active"));
-      // ativa botão da aba atual
-      document.querySelectorAll(".tab-buttons button").forEach(btn => {
-        if (btn.textContent === className) btn.classList.add("active");
-      });
+      document.querySelectorAll(".tab-buttons button.tab-btn").forEach((btn) =>
+        btn.classList.toggle("active", btn.textContent === className)
+      );
     }
 
     function addStudents(className, text) {
-      const names = text.split(/\n+/).map(n => n.trim()).filter(Boolean);
+      const names = text
+        .split(/\n+/)
+        .map((n) => n.trim())
+        .filter(Boolean);
+      if (names.length === 0) return;
+
       const ref = db.ref("classes/" + className);
-      ref.once("value", snapshot => {
+      ref.once("value", (snapshot) => {
         const list = snapshot.val() || {};
-        names.forEach(name => {
+        names.forEach((name) => {
           if (!list[name]) {
             list[name] = { dictation: 0, lessonCheck: 0, sala: 0, extra: 0 };
           }
         });
-        ref.set(list, () => {
-          renderTable(className); // Atualiza tabela após adicionar
-        });
+        ref.set(list, () => renderTable(className));
       });
     }
 
     function renderTable(className) {
       const tbody = document.getElementById("tbody-" + className);
       if (!tbody) return;
-      db.ref("classes/" + className).once("value", snapshot => {
+      db.ref("classes/" + className).once("value", (snapshot) => {
         const list = snapshot.val() || {};
         tbody.innerHTML = "";
         Object.entries(list).forEach(([name, s]) => {
@@ -256,10 +356,26 @@
           const row = document.createElement("tr");
           row.innerHTML = `
             <td>${name}</td>
-            <td><button onclick="update('${className}','${name}','dictation',1)">+1</button> <button onclick="update('${className}','${name}','dictation',-1)">-1</button> ${s.dictation}</td>
-            <td><button onclick="update('${className}','${name}','lessonCheck',1)">+1</button> <button onclick="update('${className}','${name}','lessonCheck',-1)">-1</button> ${s.lessonCheck}</td>
-            <td><button onclick="update('${className}','${name}','sala',1)">+1</button> <button onclick="update('${className}','${name}','sala',-1)">-1</button> ${s.sala}</td>
-            <td><button onclick="update('${className}','${name}','extra',1)">+1</button> <button onclick="update('${className}','${name}','extra',-1)">-1</button> ${s.extra}</td>
+            <td>
+              <button onclick="update('${className}', '${name}', 'dictation', 1)">+1</button>
+              <button onclick="update('${className}', '${name}', 'dictation', -1)">-1</button>
+              ${s.dictation}
+            </td>
+            <td>
+              <button onclick="update('${className}', '${name}', 'lessonCheck', 1)">+1</button>
+              <button onclick="update('${className}', '${name}', 'lessonCheck', -1)">-1</button>
+              ${s.lessonCheck}
+            </td>
+            <td>
+              <button onclick="update('${className}', '${name}', 'sala', 1)">+1</button>
+              <button onclick="update('${className}', '${name}', 'sala', -1)">-1</button>
+              ${s.sala}
+            </td>
+            <td>
+              <button onclick="update('${className}', '${name}', 'extra', 1)">+1</button>
+              <button onclick="update('${className}', '${name}', 'extra', -1)">-1</button>
+              ${s.extra}
+            </td>
             <td>${total}</td>
             <td><button onclick="deleteStudent('${className}', '${name}')">Excluir</button></td>
           `;
@@ -270,7 +386,7 @@
 
     function update(className, studentName, field, amount) {
       const ref = db.ref("classes/" + className + "/" + studentName);
-      ref.once("value", snapshot => {
+      ref.once("value", (snapshot) => {
         const student = snapshot.val();
         if (!student) return;
         student[field] += amount;
@@ -282,6 +398,37 @@
     function deleteStudent(className, studentName) {
       if (!confirm("Deseja excluir o aluno?")) return;
       db.ref("classes/" + className + "/" + studentName).remove(() => renderTable(className));
+    }
+
+    function renderRanking() {
+      const tbody = document.getElementById("tbody-ranking");
+      if (!tbody) return;
+      db.ref("classes").once("value", (snapshot) => {
+        const data = snapshot.val() || {};
+        let studentsList = [];
+
+        Object.entries(data).forEach(([className, students]) => {
+          Object.entries(students).forEach(([studentName, scores]) => {
+            if (studentName === "__placeholder__") return;
+            const total = (scores.dictation || 0) + (scores.lessonCheck || 0) + (scores.sala || 0) + (scores.extra || 0);
+            studentsList.push({ name: studentName, className, total });
+          });
+        });
+
+        studentsList.sort((a, b) => b.total - a.total);
+
+        tbody.innerHTML = "";
+        studentsList.forEach(({ name, className, total }, index) => {
+          const row = document.createElement("tr");
+          row.innerHTML = `
+            <td>${index + 1}</td>
+            <td>${name}</td>
+            <td>${className}</td>
+            <td>${total}</td>
+          `;
+          tbody.appendChild(row);
+        });
+      });
     }
 
     window.createClass = createClass;
