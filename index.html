@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <title>English Money Tracker</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
   <style>
@@ -27,6 +28,7 @@
       border: 1px solid #ccc;
       border-radius: 8px;
       resize: none;
+      box-sizing: border-box;
     }
     table {
       width: 100%;
@@ -41,6 +43,7 @@
       border: 1px solid #ddd;
       padding: 10px;
       text-align: center;
+      word-break: break-word;
     }
     th {
       background-color: #e8f0fe;
@@ -54,6 +57,7 @@
       background-color: #007bff;
       color: white;
       transition: background-color 0.3s;
+      user-select: none;
     }
     button:hover {
       background-color: #0056b3;
@@ -74,6 +78,12 @@
       align-items: center;
       flex-wrap: wrap;
     }
+    /* Container dos botões das abas com o botão de deletar */
+    .tab-buttons > div {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
     .tab-buttons button.tab-btn {
       background-color: #f1f1f1;
       border: 1px solid #ccc;
@@ -84,6 +94,9 @@
       align-items: center;
       gap: 6px;
       position: relative;
+      color: black; /* TEXTO PRETO quando não selecionado */
+      font-weight: normal;
+      white-space: nowrap;
     }
     .tab-buttons button.tab-btn.active {
       background-color: white;
@@ -99,6 +112,8 @@
       line-height: 1;
       height: 28px;
       min-width: 28px;
+      color: white;
+      user-select: none;
     }
     .tab-buttons button.delete-tab-btn:hover {
       background-color: #a71d2a;
@@ -119,6 +134,38 @@
       padding: 8px 12px;
       border-radius: 8px;
       user-select: none;
+      word-break: break-word;
+    }
+
+    /* RESPONSIVO */
+    @media (max-width: 600px) {
+      body {
+        padding: 10px;
+      }
+      button {
+        padding: 8px 10px;
+        font-size: 14px;
+      }
+      textarea {
+        height: 60px;
+      }
+      .tab-buttons {
+        gap: 3px;
+      }
+      .tab-buttons button.tab-btn {
+        padding: 5px 8px;
+        font-size: 14px;
+      }
+      .tab-buttons button.delete-tab-btn {
+        padding: 3px 6px;
+        height: 24px;
+        min-width: 24px;
+        font-size: 14px;
+      }
+      table th, table td {
+        padding: 6px 5px;
+        font-size: 13px;
+      }
     }
   </style>
 </head>
@@ -129,7 +176,11 @@
       type="text"
       id="newClassName"
       placeholder="Nome da nova turma"
-      onkeydown="if(event.key==='Enter'){ createClass(); }"
+      onkeydown="if(event.key==='Enter'){ event.preventDefault(); createClass(); }"
+      autocomplete="off"
+      autocorrect="off"
+      autocapitalize="off"
+      spellcheck="false"
     />
     <button onclick="createClass()">Criar turma</button>
     <button onclick="resetAll()">Resetar Tudo</button>
@@ -152,12 +203,15 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
+    let currentTab = null;
+
     function createClass() {
-      const className = document.getElementById("newClassName").value.trim();
+      const classNameInput = document.getElementById("newClassName");
+      const className = classNameInput.value.trim();
       if (!className) return alert("Digite o nome da turma!");
 
       db.ref("classes/" + className).set({ __placeholder__: true }, () => {
-        document.getElementById("newClassName").value = "";
+        classNameInput.value = "";
         renderTabs(() => switchTab(className));
       });
     }
@@ -165,7 +219,7 @@
     function resetAll() {
       if (!confirm("Tem certeza que deseja resetar tudo?")) return;
       db.ref("classes").remove(() => {
-        renderTabs();
+        renderTabs(() => currentTab = null);
       });
     }
 
@@ -177,7 +231,7 @@
           for (const studentName in data[className]) {
             if (studentName === "__placeholder__") continue;
             const s = data[className][studentName];
-            const total = s.dictation + s.lessonCheck + s.sala + s.extra;
+            const total = (s.dictation || 0) + (s.lessonCheck || 0) + (s.sala || 0) + (s.extra || 0);
             csv += `${className},${studentName},${s.dictation},${s.lessonCheck},${s.sala},${s.extra},${total}\n`;
           }
         }
@@ -199,34 +253,38 @@
         tabButtons.innerHTML = "";
         tabs.innerHTML = "";
 
-        // Botões de turmas
+        // Criar botões para cada turma
         Object.keys(classes).forEach((className) => {
+          const container = document.createElement("div");
+
           const btn = document.createElement("button");
           btn.textContent = className;
           btn.className = "tab-btn";
           btn.onclick = () => switchTab(className);
 
+          // Botão de deletar turma
           const delBtn = document.createElement("button");
           delBtn.textContent = "X";
           delBtn.className = "delete-tab-btn";
           delBtn.title = `Excluir turma "${className}"`;
           delBtn.onclick = (e) => {
-            e.stopPropagation(); // evitar switchTab
+            e.stopPropagation(); // evitar mudar aba
             if (confirm(`Deseja excluir a turma "${className}"?`)) {
-              db.ref("classes/" + className).remove(() => renderTabs());
+              db.ref("classes/" + className).remove(() => {
+                // Se a aba removida era a ativa, mudar para ranking ou primeira aba
+                if(currentTab === className) {
+                  currentTab = null;
+                }
+                renderTabs();
+              });
             }
           };
-
-          const container = document.createElement("div");
-          container.style.display = "flex";
-          container.style.alignItems = "center";
-          container.style.gap = "4px";
 
           container.appendChild(btn);
           container.appendChild(delBtn);
           tabButtons.appendChild(container);
 
-          // Conteúdo da aba
+          // Conteúdo da aba turma
           const tab = document.createElement("div");
           tab.className = "tab";
           tab.id = "tab-" + className;
@@ -251,7 +309,7 @@
           `;
           tabs.appendChild(tab);
 
-          // Evento Enter para adicionar alunos
+          // Adicionar evento para criar aluno ao apertar Enter sem Shift
           const textarea = tab.querySelector(`#textarea-${className}`);
           textarea.addEventListener("keydown", (e) => {
             if (e.key === "Enter" && !e.shiftKey) {
@@ -261,6 +319,7 @@
             }
           });
 
+          // Botão adicionar aluno
           const addBtn = tab.querySelector(`#add-btn-${className}`);
           addBtn.onclick = () => {
             addStudents(className, textarea.value);
@@ -270,13 +329,14 @@
           renderTable(className);
         });
 
-        // Aba Ranking Geral
+        // Botão aba Ranking Geral
         const rankBtn = document.createElement("button");
         rankBtn.textContent = "🏆 Ranking Geral";
         rankBtn.className = "tab-btn";
         rankBtn.onclick = () => switchTab("ranking");
         tabButtons.appendChild(rankBtn);
 
+        // Aba ranking geral
         const rankTab = document.createElement("div");
         rankTab.className = "tab";
         rankTab.id = "tab-ranking";
@@ -298,31 +358,41 @@
 
         renderRanking();
 
-        if (callback) callback();
-
-        // Ativar aba atual ou primeira
-        const activeBtn = [...tabButtons.querySelectorAll("button.tab-btn")].find((b) =>
-          b.classList.contains("active")
-        );
-        if (!activeBtn) {
-          const first = tabButtons.querySelector("button.tab-btn");
-          if (first) {
-            first.classList.add("active");
-            const firstId = first.textContent === "🏆 Ranking Geral" ? "ranking" : first.textContent;
-            switchTab(firstId);
+        // Define aba ativa
+        if (currentTab && document.getElementById("tab-" + currentTab)) {
+          switchTab(currentTab);
+        } else {
+          // Se já existir botão ativo, manter, senão ativa o primeiro
+          const activeBtn = [...tabButtons.querySelectorAll("button.tab-btn")].find((b) =>
+            b.classList.contains("active")
+          );
+          if (!activeBtn) {
+            const first = tabButtons.querySelector("button.tab-btn");
+            if (first) {
+              first.classList.add("active");
+              const firstId = first.textContent === "🏆 Ranking Geral" ? "ranking" : first.textContent;
+              switchTab(firstId);
+            }
           }
         }
+
+        if(callback) callback();
       });
     }
 
     function switchTab(className) {
+      // Atualiza a aba ativa
       document.querySelectorAll(".tab").forEach((el) => el.classList.remove("active"));
       const tab = document.getElementById("tab-" + className);
       if (tab) tab.classList.add("active");
 
-      document.querySelectorAll(".tab-buttons button.tab-btn").forEach((btn) =>
-        btn.classList.toggle("active", btn.textContent === className)
-      );
+      // Atualiza botão ativo
+      document.querySelectorAll(".tab-buttons button.tab-btn").forEach((btn) => {
+        btn.classList.toggle("active", btn.textContent === className);
+      });
+
+      currentTab = className;
+      if(className === "ranking") renderRanking();
     }
 
     function addStudents(className, text) {
@@ -352,7 +422,7 @@
         tbody.innerHTML = "";
         Object.entries(list).forEach(([name, s]) => {
           if (name === "__placeholder__") return;
-          const total = s.dictation + s.lessonCheck + s.sala + s.extra;
+          const total = (s.dictation || 0) + (s.lessonCheck || 0) + (s.sala || 0) + (s.extra || 0);
           const row = document.createElement("tr");
           row.innerHTML = `
             <td>${name}</td>
@@ -389,7 +459,7 @@
       ref.once("value", (snapshot) => {
         const student = snapshot.val();
         if (!student) return;
-        student[field] += amount;
+        student[field] = (student[field] || 0) + amount;
         if (student[field] < 0) student[field] = 0;
         ref.set(student, () => renderTable(className));
       });
@@ -431,15 +501,10 @@
       });
     }
 
-    window.createClass = createClass;
-    window.switchTab = switchTab;
-    window.addStudents = addStudents;
-    window.update = update;
-    window.deleteStudent = deleteStudent;
-    window.resetAll = resetAll;
-    window.downloadReport = downloadReport;
-
-    renderTabs();
+    // Inicializa tudo ao carregar
+    window.onload = () => {
+      renderTabs();
+    };
   </script>
 </body>
 </html>
