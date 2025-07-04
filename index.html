@@ -111,6 +111,8 @@
   <div class="header-area">
     <input type="text" id="newClassName" placeholder="Nome da nova turma">
     <button onclick="createClass()">Criar turma</button>
+    <button onclick="resetAll()">Resetar Tudo</button>
+    <button onclick="downloadReport()">Baixar Relatório</button>
   </div>
   <div class="tab-buttons" id="tabButtons"></div>
   <div id="tabs"></div>
@@ -134,6 +136,32 @@
       if (!className) return;
       db.ref("classes/" + className).set({});
       document.getElementById("newClassName").value = "";
+    }
+
+    function resetAll() {
+      if (!confirm("Tem certeza que deseja resetar tudo?")) return;
+      db.ref("classes").remove();
+    }
+
+    function downloadReport() {
+      db.ref("classes").once("value", snapshot => {
+        const data = snapshot.val();
+        let csv = "Turma,Nome,Dictation,Lesson Check,Sala,Extras,Total\n";
+        for (let className in data) {
+          for (let studentName in data[className]) {
+            const s = data[className][studentName];
+            const total = s.dictation + s.lessonCheck + s.sala + s.extra;
+            csv += `${className},${studentName},${s.dictation},${s.lessonCheck},${s.sala},${s.extra},${total}\n`;
+          }
+        }
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'english_money_report.csv';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      });
     }
 
     function renderTabs() {
@@ -166,6 +194,7 @@
                   <th>Sala</th>
                   <th>Extra</th>
                   <th>Total</th>
+                  <th>Ações</th>
                 </tr>
               </thead>
               <tbody id="tbody-${className}"></tbody>
@@ -204,15 +233,16 @@
         const list = snapshot.val() || {};
         tbody.innerHTML = "";
         Object.entries(list).forEach(([name, s]) => {
-          const row = document.createElement("tr");
           const total = s.dictation + s.lessonCheck + s.sala + s.extra;
+          const row = document.createElement("tr");
           row.innerHTML = `
             <td>${name}</td>
-            <td><button onclick="update('${className}','${name}','dictation',1)">+1</button> ${s.dictation}</td>
-            <td><button onclick="update('${className}','${name}','lessonCheck',1)">+1</button> ${s.lessonCheck}</td>
-            <td><button onclick="update('${className}','${name}','sala',1)">+1</button> ${s.sala}</td>
-            <td><button onclick="update('${className}','${name}','extra',1)">+1</button> ${s.extra}</td>
+            <td><button onclick="update('${className}','${name}','dictation',1)">+1</button> <button onclick="update('${className}','${name}','dictation',-1)">-1</button> ${s.dictation}</td>
+            <td><button onclick="update('${className}','${name}','lessonCheck',1)">+1</button> <button onclick="update('${className}','${name}','lessonCheck',-1)">-1</button> ${s.lessonCheck}</td>
+            <td><button onclick="update('${className}','${name}','sala',1)">+1</button> <button onclick="update('${className}','${name}','sala',-1)">-1</button> ${s.sala}</td>
+            <td><button onclick="update('${className}','${name}','extra',1)">+1</button> <button onclick="update('${className}','${name}','extra',-1)">-1</button> ${s.extra}</td>
             <td>${total}</td>
+            <td><button onclick="deleteStudent('${className}', '${name}')">Excluir</button></td>
           `;
           tbody.appendChild(row);
         });
@@ -229,6 +259,19 @@
         ref.set(student);
       });
     }
+
+    function deleteStudent(className, studentName) {
+      if (!confirm("Deseja excluir o aluno?")) return;
+      db.ref("classes/" + className + "/" + studentName).remove();
+    }
+
+    window.createClass = createClass;
+    window.switchTab = switchTab;
+    window.addStudents = addStudents;
+    window.update = update;
+    window.deleteStudent = deleteStudent;
+    window.resetAll = resetAll;
+    window.downloadReport = downloadReport;
 
     renderTabs();
   </script>
