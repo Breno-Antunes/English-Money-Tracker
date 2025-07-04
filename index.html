@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>English Money Tracker</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>English Money Tracker</title>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
   <style>
@@ -28,7 +28,6 @@
       border: 1px solid #ccc;
       border-radius: 8px;
       resize: none;
-      box-sizing: border-box;
     }
     table {
       width: 100%;
@@ -43,7 +42,6 @@
       border: 1px solid #ddd;
       padding: 10px;
       text-align: center;
-      word-break: break-word;
     }
     th {
       background-color: #e8f0fe;
@@ -57,7 +55,6 @@
       background-color: #007bff;
       color: white;
       transition: background-color 0.3s;
-      user-select: none;
     }
     button:hover {
       background-color: #0056b3;
@@ -75,13 +72,12 @@
       overflow-x: auto;
       padding: 10px 0;
       border-bottom: 2px solid #ccc;
-      align-items: center;
       flex-wrap: wrap;
     }
     .tab-buttons > div {
       display: flex;
       align-items: center;
-      gap: 4px;
+      gap: 3px;
     }
     .tab-buttons button.tab-btn {
       background-color: #f1f1f1;
@@ -89,13 +85,8 @@
       padding: 6px 12px;
       border-radius: 8px 8px 0 0;
       margin: 0;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      position: relative;
       color: black;
       font-weight: normal;
-      white-space: nowrap;
     }
     .tab-buttons button.tab-btn.active {
       background-color: white;
@@ -105,14 +96,12 @@
     }
     .tab-buttons button.delete-tab-btn {
       background-color: #dc3545;
-      padding: 4px 8px;
+      padding: 6px 10px;
       border-radius: 4px;
       font-weight: bold;
-      line-height: 1;
-      height: 28px;
-      min-width: 28px;
       color: white;
-      user-select: none;
+      margin-left: 0;
+      transition: background-color 0.3s;
     }
     .tab-buttons button.delete-tab-btn:hover {
       background-color: #a71d2a;
@@ -129,39 +118,21 @@
       font-size: 20px;
       margin: 15px 0 5px 0;
       color: #003366;
-      background: #cfd9f9;
-      padding: 8px 12px;
-      border-radius: 8px;
-      user-select: none;
-      word-break: break-word;
     }
     @media (max-width: 600px) {
       body {
         padding: 10px;
       }
-      button {
-        padding: 8px 10px;
-        font-size: 14px;
-      }
-      textarea {
-        height: 60px;
+      .header-area {
+        flex-direction: column;
+        align-items: stretch;
       }
       .tab-buttons {
-        gap: 3px;
+        flex-wrap: nowrap;
+        overflow-x: auto;
       }
-      .tab-buttons button.tab-btn {
-        padding: 5px 8px;
-        font-size: 14px;
-      }
-      .tab-buttons button.delete-tab-btn {
-        padding: 3px 6px;
-        height: 24px;
-        min-width: 24px;
-        font-size: 14px;
-      }
-      table th, table td {
-        padding: 6px 5px;
-        font-size: 13px;
+      .tab-buttons > div {
+        flex: none;
       }
     }
   </style>
@@ -169,20 +140,12 @@
 <body>
   <h1>ENGLISH MONEY TRACKER</h1>
   <div class="header-area">
-    <input
-      type="text"
-      id="newClassName"
-      placeholder="Nome da nova turma"
-      onkeydown="if(event.key==='Enter'){ event.preventDefault(); createClass(); }"
-      autocomplete="off"
-      autocorrect="off"
-      autocapitalize="off"
-      spellcheck="false"
-    />
+    <input type="text" id="newClassName" placeholder="Nome da nova turma" />
     <button onclick="createClass()">Criar turma</button>
     <button onclick="resetAll()">Resetar Tudo</button>
     <button onclick="downloadReport()">Baixar Relatório</button>
   </div>
+
   <div class="tab-buttons" id="tabButtons"></div>
   <div id="tabs"></div>
 
@@ -200,38 +163,44 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
+    // Normaliza nome para id HTML seguro
+    function safeId(name) {
+      return name.replace(/\s+/g, '_').replace(/[^\w\-]/g, '');
+    }
+
     let currentTab = null;
 
     function createClass() {
-      const classNameInput = document.getElementById("newClassName");
-      const className = classNameInput.value.trim();
-      if (!className) return alert("Digite o nome da turma!");
-
-      // Use update para não sobrescrever tudo
-      let updateObj = {};
-      updateObj["classes/" + className] = { __placeholder__: true };
-      db.ref().update(updateObj, () => {
-        classNameInput.value = "";
-        renderTabs(() => switchTab(className));
+      const className = document.getElementById("newClassName").value.trim();
+      if (!className) return alert("Digite o nome da turma");
+      db.ref("classes/" + className).set({ __placeholder__: true }, (error) => {
+        if (error) {
+          alert("Erro ao criar turma");
+        } else {
+          document.getElementById("newClassName").value = "";
+          currentTab = className;
+          renderTabs();
+        }
       });
     }
 
     function resetAll() {
       if (!confirm("Tem certeza que deseja resetar tudo?")) return;
       db.ref("classes").remove(() => {
-        renderTabs(() => currentTab = null);
+        currentTab = null;
+        renderTabs();
       });
     }
 
     function downloadReport() {
-      db.ref("classes").once("value", (snapshot) => {
-        const data = snapshot.val() || {};
+      db.ref("classes").once("value", snapshot => {
+        const data = snapshot.val();
         let csv = "Turma,Nome,Dictation,Lesson Check,Sala,Extras,Total\n";
-        for (const className in data) {
-          for (const studentName in data[className]) {
+        for (let className in data) {
+          for (let studentName in data[className]) {
             if (studentName === "__placeholder__") continue;
             const s = data[className][studentName];
-            const total = (s.dictation || 0) + (s.lessonCheck || 0) + (s.sala || 0) + (s.extra || 0);
+            const total = (s.dictation||0) + (s.lessonCheck||0) + (s.sala||0) + (s.extra||0);
             csv += `${className},${studentName},${s.dictation},${s.lessonCheck},${s.sala},${s.extra},${total}\n`;
           }
         }
@@ -245,7 +214,7 @@
       });
     }
 
-    function renderTabs(callback) {
+    function renderTabs() {
       db.ref("classes").once("value", (snapshot) => {
         const classes = snapshot.val() || {};
         const tabButtons = document.getElementById("tabButtons");
@@ -253,8 +222,10 @@
         tabButtons.innerHTML = "";
         tabs.innerHTML = "";
 
-        // Criar botões para cada turma
-        Object.keys(classes).forEach((className) => {
+        // cria botão e aba para cada turma
+        Object.keys(classes).forEach(className => {
+          const id = safeId(className);
+
           const container = document.createElement("div");
 
           const btn = document.createElement("button");
@@ -262,13 +233,12 @@
           btn.className = "tab-btn";
           btn.onclick = () => switchTab(className);
 
-          // Botão de deletar turma
           const delBtn = document.createElement("button");
           delBtn.textContent = "X";
           delBtn.className = "delete-tab-btn";
           delBtn.title = `Excluir turma "${className}"`;
           delBtn.onclick = (e) => {
-            e.stopPropagation(); // evitar mudar aba
+            e.stopPropagation();
             if (confirm(`Deseja excluir a turma "${className}"?`)) {
               db.ref("classes/" + className).remove(() => {
                 if(currentTab === className) currentTab = null;
@@ -281,14 +251,13 @@
           container.appendChild(delBtn);
           tabButtons.appendChild(container);
 
-          // Conteúdo da aba turma
           const tab = document.createElement("div");
           tab.className = "tab";
-          tab.id = "tab-" + className;
+          tab.id = "tab-" + id;
           tab.innerHTML = `
             <div class="class-title">Turma: ${className}</div>
-            <textarea id="textarea-${className}" placeholder="Adicionar alunos... (Shift+Enter para múltiplos)" ></textarea>
-            <button id="add-btn-${className}">Adicionar Alunos</button>
+            <textarea id="textarea-${id}" placeholder="Adicionar alunos... (Shift+Enter para múltiplos)"></textarea>
+            <button id="add-btn-${id}">Adicionar Alunos</button>
             <table>
               <thead>
                 <tr>
@@ -301,13 +270,13 @@
                   <th>Ações</th>
                 </tr>
               </thead>
-              <tbody id="tbody-${className}"></tbody>
+              <tbody id="tbody-${id}"></tbody>
             </table>
           `;
           tabs.appendChild(tab);
 
-          // Adicionar evento para criar aluno ao apertar Enter sem Shift
-          const textarea = tab.querySelector(`#textarea-${className}`);
+          // Enter para adicionar alunos
+          const textarea = tab.querySelector(`#textarea-${id}`);
           textarea.addEventListener("keydown", (e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
@@ -316,8 +285,7 @@
             }
           });
 
-          // Botão adicionar aluno
-          const addBtn = tab.querySelector(`#add-btn-${className}`);
+          const addBtn = tab.querySelector(`#add-btn-${id}`);
           addBtn.onclick = () => {
             addStudents(className, textarea.value);
             textarea.value = "";
@@ -326,14 +294,13 @@
           renderTable(className);
         });
 
-        // Botão aba Ranking Geral
+        // Ranking Geral botão e aba
         const rankBtn = document.createElement("button");
         rankBtn.textContent = "🏆 Ranking Geral";
         rankBtn.className = "tab-btn";
         rankBtn.onclick = () => switchTab("ranking");
         tabButtons.appendChild(rankBtn);
 
-        // Aba ranking geral
         const rankTab = document.createElement("div");
         rankTab.className = "tab";
         rankTab.id = "tab-ranking";
@@ -353,71 +320,69 @@
         `;
         tabs.appendChild(rankTab);
 
-        renderRanking();
-
-        if (currentTab && document.getElementById("tab-" + currentTab)) {
+        // Define aba ativa
+        if (currentTab && document.getElementById("tab-" + safeId(currentTab))) {
           switchTab(currentTab);
         } else {
-          // Se já existir botão ativo, manter, senão ativa o primeiro
-          const activeBtn = [...tabButtons.querySelectorAll("button.tab-btn")].find((b) =>
-            b.classList.contains("active")
-          );
-          if (!activeBtn) {
-            const first = tabButtons.querySelector("button.tab-btn");
-            if (first) {
-              first.classList.add("active");
-              const firstId = first.textContent === "🏆 Ranking Geral" ? "ranking" : first.textContent;
-              switchTab(firstId);
-            }
+          // Seleciona a primeira turma ou ranking
+          const firstBtn = tabButtons.querySelector("button.tab-btn");
+          if (firstBtn) {
+            firstBtn.classList.add("active");
+            const firstName = firstBtn.textContent === "🏆 Ranking Geral" ? "ranking" : firstBtn.textContent;
+            switchTab(firstName);
           }
         }
 
-        if(callback) callback();
+        renderRanking();
       });
     }
 
     function switchTab(className) {
-      document.querySelectorAll(".tab").forEach((el) => el.classList.remove("active"));
-      const tab = document.getElementById("tab-" + className);
+      document.querySelectorAll(".tab").forEach(el => el.classList.remove("active"));
+      const id = className === "ranking" ? "ranking" : safeId(className);
+      const tab = document.getElementById("tab-" + id);
       if (tab) tab.classList.add("active");
 
-      document.querySelectorAll(".tab-buttons button.tab-btn").forEach((btn) => {
+      document.querySelectorAll(".tab-buttons button.tab-btn").forEach(btn => {
         btn.classList.toggle("active", btn.textContent === className);
       });
 
       currentTab = className;
-      if(className === "ranking") renderRanking();
+
+      if (className === "ranking") renderRanking();
     }
 
     function addStudents(className, text) {
-      const names = text
-        .split(/\n+/)
-        .map((n) => n.trim())
-        .filter(Boolean);
-      if (names.length === 0) return;
-
+      const names = text.split(/\n+/).map(n => n.trim()).filter(Boolean);
+      if(names.length === 0) return alert("Digite pelo menos um nome");
       const ref = db.ref("classes/" + className);
-      ref.once("value", (snapshot) => {
+      ref.once("value", snapshot => {
         const list = snapshot.val() || {};
-        names.forEach((name) => {
+        names.forEach(name => {
           if (!list[name]) {
             list[name] = { dictation: 0, lessonCheck: 0, sala: 0, extra: 0 };
           }
         });
-        // Usar update para não sobrescrever a turma inteira
-        ref.update(list, () => renderTable(className));
+        ref.set(list, (error) => {
+          if (error) {
+            alert("Erro ao adicionar alunos");
+          } else {
+            renderTable(className);
+          }
+        });
       });
     }
 
     function renderTable(className) {
-      const tbody = document.getElementById("tbody-" + className);
+      const id = safeId(className);
+      const tbody = document.getElementById("tbody-" + id);
       if (!tbody) return;
-      db.ref("classes/" + className).once("value", (snapshot) => {
+      db.ref("classes/" + className).once("value", snapshot => {
         const list = snapshot.val() || {};
         tbody.innerHTML = "";
         Object.entries(list).forEach(([name, s]) => {
           if (name === "__placeholder__") return;
-          const total = (s.dictation || 0) + (s.lessonCheck || 0) + (s.sala || 0) + (s.extra || 0);
+          const total = (s.dictation||0) + (s.lessonCheck||0) + (s.sala||0) + (s.extra||0);
           const row = document.createElement("tr");
           row.innerHTML = `
             <td>${name}</td>
@@ -451,54 +416,63 @@
 
     function update(className, studentName, field, amount) {
       const ref = db.ref("classes/" + className + "/" + studentName);
-      ref.once("value", (snapshot) => {
+      ref.once("value", snapshot => {
         const student = snapshot.val();
         if (!student) return;
         student[field] = (student[field] || 0) + amount;
         if (student[field] < 0) student[field] = 0;
-        ref.set(student, () => renderTable(className));
+        ref.set(student, (error) => {
+          if(error) alert("Erro ao atualizar dados");
+          else renderTable(className);
+        });
       });
     }
 
     function deleteStudent(className, studentName) {
       if (!confirm("Deseja excluir o aluno?")) return;
-      db.ref("classes/" + className + "/" + studentName).remove(() => renderTable(className));
+      db.ref("classes/" + className + "/" + studentName).remove(() => {
+        renderTable(className);
+      });
     }
 
     function renderRanking() {
       const tbody = document.getElementById("tbody-ranking");
       if (!tbody) return;
-      db.ref("classes").once("value", (snapshot) => {
-        const data = snapshot.val() || {};
-        let studentsList = [];
-
-        Object.entries(data).forEach(([className, students]) => {
-          Object.entries(students).forEach(([studentName, scores]) => {
+      db.ref("classes").once("value", snapshot => {
+        const classes = snapshot.val() || {};
+        const students = [];
+        Object.entries(classes).forEach(([className, list]) => {
+          Object.entries(list).forEach(([studentName, s]) => {
             if (studentName === "__placeholder__") return;
-            const total = (scores.dictation || 0) + (scores.lessonCheck || 0) + (scores.sala || 0) + (scores.extra || 0);
-            studentsList.push({ name: studentName, className, total });
+            const total = (s.dictation||0) + (s.lessonCheck||0) + (s.sala||0) + (s.extra||0);
+            students.push({ name: studentName, className, total });
           });
         });
-
-        studentsList.sort((a, b) => b.total - a.total);
-
+        students.sort((a, b) => b.total - a.total);
         tbody.innerHTML = "";
-        studentsList.forEach(({ name, className, total }, index) => {
-          const row = document.createElement("tr");
-          row.innerHTML = `
-            <td>${index + 1}</td>
-            <td>${name}</td>
-            <td>${className}</td>
-            <td>${total}</td>
+        students.forEach((s, i) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${i + 1}</td>
+            <td>${s.name}</td>
+            <td>${s.className}</td>
+            <td>${s.total}</td>
           `;
-          tbody.appendChild(row);
+          tbody.appendChild(tr);
         });
       });
     }
 
-    window.onload = () => {
-      renderTabs();
-    };
+    // Enter para criar turma
+    document.getElementById("newClassName").addEventListener("keydown", e => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        createClass();
+      }
+    });
+
+    // Inicializa
+    renderTabs();
   </script>
 </body>
 </html>
