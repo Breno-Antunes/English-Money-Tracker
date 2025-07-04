@@ -134,8 +134,11 @@
     function createClass() {
       const className = document.getElementById("newClassName").value.trim();
       if (!className) return;
-      db.ref("classes/" + className).set({ __placeholder__: true });
-      document.getElementById("newClassName").value = "";
+
+      db.ref("classes/" + className).set({ __placeholder__: true }, () => {
+        document.getElementById("newClassName").value = "";
+        renderTabs(); // Atualiza as abas para mostrar a nova turma
+      });
     }
 
     function resetAll() {
@@ -166,7 +169,7 @@
     }
 
     function renderTabs() {
-      db.ref("classes").on("value", snapshot => {
+      db.ref("classes").once("value", snapshot => {
         const classes = snapshot.val() || {};
         const tabButtons = document.getElementById("tabButtons");
         const tabs = document.getElementById("tabs");
@@ -204,6 +207,12 @@
           tabs.appendChild(tab);
           renderTable(className);
         });
+
+        // Ativa a primeira aba automaticamente
+        const firstClass = Object.keys(classes)[0];
+        if (firstClass) {
+          switchTab(firstClass);
+        }
       });
     }
 
@@ -211,6 +220,12 @@
       document.querySelectorAll(".tab").forEach(el => el.classList.remove("active"));
       const tab = document.getElementById("tab-" + className);
       if (tab) tab.classList.add("active");
+
+      document.querySelectorAll(".tab-buttons button").forEach(btn => btn.classList.remove("active"));
+      // ativa botão da aba atual
+      document.querySelectorAll(".tab-buttons button").forEach(btn => {
+        if (btn.textContent === className) btn.classList.add("active");
+      });
     }
 
     function addStudents(className, text) {
@@ -223,14 +238,16 @@
             list[name] = { dictation: 0, lessonCheck: 0, sala: 0, extra: 0 };
           }
         });
-        ref.set(list);
+        ref.set(list, () => {
+          renderTable(className); // Atualiza tabela após adicionar
+        });
       });
     }
 
     function renderTable(className) {
       const tbody = document.getElementById("tbody-" + className);
       if (!tbody) return;
-      db.ref("classes/" + className).on("value", snapshot => {
+      db.ref("classes/" + className).once("value", snapshot => {
         const list = snapshot.val() || {};
         tbody.innerHTML = "";
         Object.entries(list).forEach(([name, s]) => {
@@ -258,13 +275,13 @@
         if (!student) return;
         student[field] += amount;
         if (student[field] < 0) student[field] = 0;
-        ref.set(student);
+        ref.set(student, () => renderTable(className));
       });
     }
 
     function deleteStudent(className, studentName) {
       if (!confirm("Deseja excluir o aluno?")) return;
-      db.ref("classes/" + className + "/" + studentName).remove();
+      db.ref("classes/" + className + "/" + studentName).remove(() => renderTable(className));
     }
 
     window.createClass = createClass;
