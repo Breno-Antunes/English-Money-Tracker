@@ -121,7 +121,7 @@
       authDomain: "english-money-tracker-f5633.firebaseapp.com",
       databaseURL: "https://english-money-tracker-f5633-default-rtdb.firebaseio.com",
       projectId: "english-money-tracker-f5633",
-      storageBucket: "english-money-tracker-f5633.firebasestorage.app",
+      storageBucket: "english-money-tracker-f5633.appspot.com",
       messagingSenderId: "858563470666",
       appId: "1:858563470666:web:f06ca83dbbf04c01d0cdb3"
     };
@@ -132,13 +132,12 @@
     function createClass() {
       const className = document.getElementById("newClassName").value.trim();
       if (!className) return;
-      db.ref("classes/" + className).set([]);
+      db.ref("classes/" + className).set({});
       document.getElementById("newClassName").value = "";
-      renderTabs();
     }
 
     function renderTabs() {
-      db.ref("classes").once("value", snapshot => {
+      db.ref("classes").on("value", snapshot => {
         const classes = snapshot.val() || {};
         const tabButtons = document.getElementById("tabButtons");
         const tabs = document.getElementById("tabs");
@@ -188,32 +187,31 @@
       const names = text.split(/\n+/).map(n => n.trim()).filter(Boolean);
       const ref = db.ref("classes/" + className);
       ref.once("value", snapshot => {
-        const list = snapshot.val() || [];
+        const list = snapshot.val() || {};
         names.forEach(name => {
-          if (!list.some(s => s.name === name)) {
-            list.push({ name, dictation: 0, lessonCheck: 0, sala: 0, extra: 0 });
+          if (!list[name]) {
+            list[name] = { dictation: 0, lessonCheck: 0, sala: 0, extra: 0 };
           }
         });
         ref.set(list);
-        renderTable(className);
       });
     }
 
     function renderTable(className) {
       const tbody = document.getElementById("tbody-" + className);
       if (!tbody) return;
-      db.ref("classes/" + className).once("value", snapshot => {
-        const list = snapshot.val() || [];
+      db.ref("classes/" + className).on("value", snapshot => {
+        const list = snapshot.val() || {};
         tbody.innerHTML = "";
-        list.forEach(s => {
+        Object.entries(list).forEach(([name, s]) => {
           const row = document.createElement("tr");
           const total = s.dictation + s.lessonCheck + s.sala + s.extra;
           row.innerHTML = `
-            <td>${s.name}</td>
-            <td><button onclick="update('${className}','${s.name}','dictation',1)">+1</button> ${s.dictation}</td>
-            <td><button onclick="update('${className}','${s.name}','lessonCheck',1)">+1</button> ${s.lessonCheck}</td>
-            <td><button onclick="update('${className}','${s.name}','sala',1)">+1</button> ${s.sala}</td>
-            <td><button onclick="update('${className}','${s.name}','extra',1)">+1</button> ${s.extra}</td>
+            <td>${name}</td>
+            <td><button onclick="update('${className}','${name}','dictation',1)">+1</button> ${s.dictation}</td>
+            <td><button onclick="update('${className}','${name}','lessonCheck',1)">+1</button> ${s.lessonCheck}</td>
+            <td><button onclick="update('${className}','${name}','sala',1)">+1</button> ${s.sala}</td>
+            <td><button onclick="update('${className}','${name}','extra',1)">+1</button> ${s.extra}</td>
             <td>${total}</td>
           `;
           tbody.appendChild(row);
@@ -222,14 +220,13 @@
     }
 
     function update(className, studentName, field, amount) {
-      const ref = db.ref("classes/" + className);
+      const ref = db.ref("classes/" + className + "/" + studentName);
       ref.once("value", snapshot => {
-        const list = snapshot.val() || [];
-        const student = list.find(s => s.name === studentName);
+        const student = snapshot.val();
         if (!student) return;
         student[field] += amount;
-        ref.set(list);
-        renderTable(className);
+        if (student[field] < 0) student[field] = 0;
+        ref.set(student);
       });
     }
 
