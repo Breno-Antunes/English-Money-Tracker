@@ -78,7 +78,6 @@
       align-items: center;
       flex-wrap: wrap;
     }
-    /* Container dos botões das abas com o botão de deletar */
     .tab-buttons > div {
       display: flex;
       align-items: center;
@@ -94,7 +93,7 @@
       align-items: center;
       gap: 6px;
       position: relative;
-      color: black; /* TEXTO PRETO quando não selecionado */
+      color: black;
       font-weight: normal;
       white-space: nowrap;
     }
@@ -136,8 +135,6 @@
       user-select: none;
       word-break: break-word;
     }
-
-    /* RESPONSIVO */
     @media (max-width: 600px) {
       body {
         padding: 10px;
@@ -210,7 +207,10 @@
       const className = classNameInput.value.trim();
       if (!className) return alert("Digite o nome da turma!");
 
-      db.ref("classes/" + className).set({ __placeholder__: true }, () => {
+      // Use update para não sobrescrever tudo
+      let updateObj = {};
+      updateObj["classes/" + className] = { __placeholder__: true };
+      db.ref().update(updateObj, () => {
         classNameInput.value = "";
         renderTabs(() => switchTab(className));
       });
@@ -271,10 +271,7 @@
             e.stopPropagation(); // evitar mudar aba
             if (confirm(`Deseja excluir a turma "${className}"?`)) {
               db.ref("classes/" + className).remove(() => {
-                // Se a aba removida era a ativa, mudar para ranking ou primeira aba
-                if(currentTab === className) {
-                  currentTab = null;
-                }
+                if(currentTab === className) currentTab = null;
                 renderTabs();
               });
             }
@@ -358,7 +355,6 @@
 
         renderRanking();
 
-        // Define aba ativa
         if (currentTab && document.getElementById("tab-" + currentTab)) {
           switchTab(currentTab);
         } else {
@@ -381,12 +377,10 @@
     }
 
     function switchTab(className) {
-      // Atualiza a aba ativa
       document.querySelectorAll(".tab").forEach((el) => el.classList.remove("active"));
       const tab = document.getElementById("tab-" + className);
       if (tab) tab.classList.add("active");
 
-      // Atualiza botão ativo
       document.querySelectorAll(".tab-buttons button.tab-btn").forEach((btn) => {
         btn.classList.toggle("active", btn.textContent === className);
       });
@@ -410,7 +404,8 @@
             list[name] = { dictation: 0, lessonCheck: 0, sala: 0, extra: 0 };
           }
         });
-        ref.set(list, () => renderTable(className));
+        // Usar update para não sobrescrever a turma inteira
+        ref.update(list, () => renderTable(className));
       });
     }
 
@@ -501,7 +496,6 @@
       });
     }
 
-    // Inicializa tudo ao carregar
     window.onload = () => {
       renderTabs();
     };
