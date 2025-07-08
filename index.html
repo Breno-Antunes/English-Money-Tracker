@@ -1,138 +1,193 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="UTF-8">
   <title>English Money Tracker</title>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Urbanist:wght@600&display=swap" rel="stylesheet">
   <style>
+    * {
+      box-sizing: border-box;
+    }
     body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: linear-gradient(to right, #f0f4ff, #ffffff);
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(135deg, #dbeafe, #e0e7ff);
       padding: 20px;
       margin: 0;
+      backdrop-filter: blur(14px);
+      color: #111827;
     }
     h1 {
       text-align: center;
       margin-bottom: 30px;
-      color: #003366;
-    }
-    textarea, button, input {
-      font-size: 16px;
-    }
-    textarea {
-      width: 100%;
-      height: 80px;
-      padding: 10px;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      resize: none;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 20px;
-      background-color: white;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-      border-radius: 10px;
-      overflow: hidden;
-    }
-    th, td {
-      border: 1px solid #ddd;
-      padding: 10px;
-      text-align: center;
-    }
-    th {
-      background-color: #e8f0fe;
-    }
-    button {
-      padding: 6px 12px;
-      margin: 2px;
-      cursor: pointer;
-      border-radius: 5px;
-      border: none;
-      background-color: #007bff;
-      color: white;
-      transition: background-color 0.3s;
-    }
-    button:hover {
-      background-color: #0056b3;
-    }
-    .tab {
-      display: none;
-    }
-    .tab.active {
-      display: block;
-    }
-    .tab-buttons {
-      display: flex;
-      gap: 5px;
-      margin-bottom: 10px;
-      overflow-x: auto;
-      padding: 10px 0;
-      border-bottom: 2px solid #ccc;
-      flex-wrap: wrap;
-    }
-    .tab-buttons > div {
-      display: flex;
-      align-items: center;
-      gap: 3px;
-    }
-    .tab-buttons button.tab-btn {
-      background-color: #f1f1f1;
-      border: 1px solid #ccc;
-      padding: 6px 12px;
-      border-radius: 8px 8px 0 0;
-      margin: 0;
-      color: black;
-      font-weight: normal;
-    }
-    .tab-buttons button.tab-btn.active {
-      background-color: white;
-      border-bottom: 2px solid white;
-      font-weight: bold;
-      color: #007bff;
-    }
-    .tab-buttons button.delete-tab-btn {
-      background-color: #dc3545;
-      padding: 6px 10px;
-      border-radius: 4px;
-      font-weight: bold;
-      color: white;
-      margin-left: 0;
-      transition: background-color 0.3s;
-    }
-    .tab-buttons button.delete-tab-btn:hover {
-      background-color: #a71d2a;
+      color: #1e3a8a;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      font-family: 'Urbanist', sans-serif;
     }
     .header-area {
       display: flex;
       align-items: center;
       flex-wrap: wrap;
       gap: 10px;
-      margin-bottom: 10px;
+      margin-bottom: 20px;
     }
     .class-title {
-      font-weight: bold;
+      font-weight: 600;
       font-size: 20px;
       margin: 15px 0 5px 0;
-      color: #003366;
+      color: #1e3a8a;
     }
-    @media (max-width: 600px) {
-      body {
-        padding: 10px;
-      }
+    .tab-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 20px;
+      padding: 10px 0;
+    }
+    .tab-buttons > div {
+      display: flex;
+      align-items: center;
+      border-radius: 20px;
+      overflow: hidden;
+      background: rgba(255,255,255,0.25);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      transition: transform 0.2s ease;
+    }
+    .tab-buttons > div:hover {
+      transform: scale(1.05);
+    }
+    .tab-buttons button.tab-btn {
+      border: none;
+      background: transparent;
+      padding: 10px 14px;
+      color: #1e3a8a;
+      font-weight: 500;
+    }
+    .tab-buttons button.tab-btn.active {
+      background-color: rgba(255,255,255,0.5);
+      font-weight: bold;
+      color: #1e3a8a;
+    }
+    .tab-buttons button.delete-tab-btn {
+      border: none;
+      padding: 10px 12px;
+      background-color: rgba(0, 0, 0, 0);
+      color: #1e3a8a;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+    .tab-buttons button.delete-tab-btn:hover {
+      background-color: rgba(0, 0, 0, 0.2);
+    }
+    textarea, input, button {
+      font-size: 16px;
+      font-family: 'Inter', sans-serif;
+    }
+    textarea, input {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid rgba(255,255,255,0.4);
+      border-radius: 14px;
+      background: rgba(255,255,255,0.25);
+      color: #111827;
+      backdrop-filter: blur(10px);
+      margin-bottom: 10px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    input::placeholder, textarea::placeholder {
+      color: #6b7280;
+    }
+    button {
+      padding: 10px 16px;
+      margin: 2px;
+      cursor: pointer;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.3);
+      background-color: rgba(255,255,255,0.2);
+      color: #1e3a8a;
+      backdrop-filter: blur(6px);
+      transition: background-color 0.3s ease, transform 0.2s ease;
+    }
+    button:hover {
+      background-color: rgba(255,255,255,0.4);
+      transform: scale(1.05);
+    }
+    .tab {
+      display: none;
+      transform: translateY(20px);
+      opacity: 0;
+      transition: all 0.4s ease;
+    }
+    .tab.active {
+      display: block;
+      transform: translateY(0);
+      opacity: 1;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+      background: rgba(255, 255, 255, 0.25);
+      backdrop-filter: blur(10px);
+      border-radius: 14px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.1);
+    }
+    th, td {
+      border: 1px solid rgba(255,255,255,0.2);
+      padding: 12px;
+      text-align: center;
+      color: #111827;
+      word-break: break-word;
+    }
+    th {
+      background-color: rgba(255,255,255,0.3);
+      color: #1e3a8a;
+      font-weight: 600;
+    }
+    .counter-cell {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-size: 16px;
+      font-weight: bold;
+    }
+    .counter-cell button {
+      font-size: 18px;
+      padding: 4px 8px;
+      background-color: rgba(255,255,255,0.4);
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+    }
+    .counter-cell button:hover {
+      background-color: rgba(255,255,255,0.6);
+    }
+    .arrow-btn {
+      background: none;
+      border: none;
+      font-size: 18px;
+      padding: 4px 10px;
+      cursor: pointer;
+      color: #1e3a8a;
+    }
+    .arrow-btn:hover {
+      color: #2563eb;
+    }
+    @media (max-width: 640px) {
       .header-area {
         flex-direction: column;
         align-items: stretch;
       }
       .tab-buttons {
-        flex-wrap: nowrap;
         overflow-x: auto;
+        flex-wrap: nowrap;
       }
-      .tab-buttons > div {
-        flex: none;
+      table {
+        font-size: 14px;
       }
     }
   </style>
@@ -140,16 +195,14 @@
 <body>
   <h1>ENGLISH MONEY TRACKER</h1>
   <div class="header-area">
-    <input type="text" id="newClassName" placeholder="Nome da nova turma" />
-    <button onclick="createClass()">Criar turma</button>
+    <input type="text" id="newClassName" placeholder="Nome da nova turma">
+    <button onclick="createClass()">Criar Turma</button>
     <button onclick="resetAll()">Resetar Tudo</button>
     <button onclick="downloadReport()">Baixar Relatório</button>
   </div>
-
   <div class="tab-buttons" id="tabButtons"></div>
   <div id="tabs"></div>
-
-  <script>
+<script>
     const firebaseConfig = {
       apiKey: "AIzaSyDsn0ZeBseWNUaSCUXIpH4lcPpCfDMJpuo",
       authDomain: "english-money-tracker-f5633.firebaseapp.com",
