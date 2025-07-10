@@ -246,26 +246,51 @@
     }
 
     function downloadReport() {
-      db.ref("classes").once("value", snapshot => {
-        const data = snapshot.val();
-        let csv = "Turma,Nome,Dictation,Lesson Check,Sala,Extras,Total\n";
-        for (let className in data) {
-          for (let studentName in data[className]) {
-            if (studentName === "__placeholder__") continue;
-            const s = data[className][studentName];
-            const total = (s.dictation||0) + (s.lessonCheck||0) + (s.sala||0) + (s.extra||0);
-            csv += `${className},${studentName},${s.dictation},${s.lessonCheck},${s.sala},${s.extra},${total}\n`;
-          }
-        }
-        const blob = new Blob([csv], { type: "text/csv" });
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(blob);
-        link.download = "english_money_report.csv";
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      });
+  db.ref("classes").once("value", snapshot => {
+    const data = snapshot.val();
+    let txt = "";
+
+    for (let className in data) {
+      let alunosDaTurma = [];
+
+      for (let studentName in data[className]) {
+        if (studentName === "__placeholder__") continue;
+
+        const s = data[className][studentName];
+        const dictation = s.dictation || 0;
+        const lessonCheck = s.lessonCheck || 0;
+        const sala = s.sala || 0;
+        const extra = s.extra || 0;
+        const total = dictation + lessonCheck + sala + extra;
+
+        if (total === 0) continue;
+
+        const em = total * 5;
+        const atividades = [];
+
+        if (dictation > 0) atividades.push(`${dictation} dictation${dictation > 1 ? "s" : ""} corrigido${dictation > 1 ? "s" : ""}`);
+        if (lessonCheck > 0) atividades.push(`${lessonCheck} lesson check${lessonCheck > 1 ? "s" : ""} feito${lessonCheck > 1 ? "s" : ""}`);
+        if (sala > 0) atividades.push(`${sala} atividade${sala > 1 ? "s" : ""} em sala`);
+        if (extra > 0) atividades.push(`${extra} atividade${extra > 1 ? "s" : ""} extra${extra > 1 ? "s" : ""}`);
+
+        alunosDaTurma.push(`${studentName} - ${em}EM (${atividades.join(", ")})`);
+      }
+
+      if (alunosDaTurma.length > 0) {
+        txt += `${className}\n${alunosDaTurma.join("\n")}\n\n`;
+      }
     }
+
+    const blob = new Blob([txt], { type: "text/plain;charset=utf-8" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "english_money_report.txt";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  });
+}
+
 
     function renderTabs() {
       db.ref("classes").once("value", (snapshot) => {
@@ -438,48 +463,69 @@
           const total = (s.dictation||0) + (s.lessonCheck||0) + (s.sala||0) + (s.extra||0);
           const row = document.createElement("tr");
           row.innerHTML = `
-            <td>${name}</td>
-            <td>
-              <button onclick="update('${className}', '${name}', 'dictation', 1)">+1</button>
-              <button onclick="update('${className}', '${name}', 'dictation', -1)">-1</button>
-              ${s.dictation}
-            </td>
-            <td>
-              <button onclick="update('${className}', '${name}', 'lessonCheck', 1)">+1</button>
-              <button onclick="update('${className}', '${name}', 'lessonCheck', -1)">-1</button>
-              ${s.lessonCheck}
-            </td>
-            <td>
-              <button onclick="update('${className}', '${name}', 'sala', 1)">+1</button>
-              <button onclick="update('${className}', '${name}', 'sala', -1)">-1</button>
-              ${s.sala}
-            </td>
-            <td>
-              <button onclick="update('${className}', '${name}', 'extra', 1)">+1</button>
-              <button onclick="update('${className}', '${name}', 'extra', -1)">-1</button>
-              ${s.extra}
-            </td>
-            <td>${total}</td>
-            <td><button onclick="deleteStudent('${className}', '${name}')">Excluir</button></td>
-          `;
+  <td>${name}</td>
+  <td>
+    <button onclick="update('${className}', '${name}', 'dictation', 1)">+1</button>
+    <button onclick="update('${className}', '${name}', 'dictation', -1)">-1</button>
+    <span>${s.dictation || 0}</span>
+  </td>
+  <td>
+    <button onclick="update('${className}', '${name}', 'lessonCheck', 1)">+1</button>
+    <button onclick="update('${className}', '${name}', 'lessonCheck', -1)">-1</button>
+    <span>${s.lessonCheck || 0}</span>
+  </td>
+  <td>
+    <button onclick="update('${className}', '${name}', 'sala', 1)">+1</button>
+    <button onclick="update('${className}', '${name}', 'sala', -1)">-1</button>
+    <span>${s.sala || 0}</span>
+  </td>
+  <td>
+    <button onclick="update('${className}', '${name}', 'extra', 1)">+1</button>
+    <button onclick="update('${className}', '${name}', 'extra', -1)">-1</button>
+    <span>${s.extra || 0}</span>
+  </td>
+  <td>${(s.dictation || 0) + (s.lessonCheck || 0) + (s.sala || 0) + (s.extra || 0)}</td>
+  <td><button onclick="deleteStudent('${className}', '${name}')">Excluir</button></td>
+`;
           tbody.appendChild(row);
         });
       });
     }
 
     function update(className, studentName, field, amount) {
-      const ref = db.ref("classes/" + className + "/" + studentName);
-      ref.once("value", snapshot => {
-        const student = snapshot.val();
-        if (!student) return;
-        student[field] = (student[field] || 0) + amount;
-        if (student[field] < 0) student[field] = 0;
-        ref.set(student, (error) => {
-          if(error) alert("Erro ao atualizar dados");
-          else renderTable(className);
-        });
-      });
-    }
+  // Atualiza visualmente primeiro (efeito imediato)
+  const id = safeId(className);
+  const row = Array.from(document.querySelectorAll(`#tbody-${id} tr`))
+    .find(tr => tr.querySelector("td")?.textContent === studentName);
+
+  if (row) {
+    const fields = { dictation: 1, lessonCheck: 2, sala: 3, extra: 4 };
+    const td = row.children[fields[field]];
+    const countSpan = td.querySelector("span");
+    const current = parseInt(countSpan?.textContent || "0");
+    const updated = Math.max(0, current + amount);
+    countSpan.textContent = updated;
+
+    // Atualiza o total também
+    const totalTd = row.children[5];
+    let newTotal = 0;
+    ["dictation", "lessonCheck", "sala", "extra"].forEach(f => {
+      const col = row.children[fields[f]];
+      const num = parseInt(col.querySelector("span")?.textContent || "0");
+      newTotal += num;
+    });
+    totalTd.textContent = newTotal;
+  }
+
+  // Agora atualiza no banco
+  const ref = db.ref("classes/" + className + "/" + studentName);
+  ref.transaction(student => {
+    if (!student) return student;
+    student[field] = (student[field] || 0) + amount;
+    if (student[field] < 0) student[field] = 0;
+    return student;
+  });
+}
 
     function deleteStudent(className, studentName) {
       if (!confirm("Deseja excluir o aluno?")) return;
